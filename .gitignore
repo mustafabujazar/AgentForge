@@ -1,0 +1,51 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+pytest-of-*/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local databases and generated data (regenerate with scripts/generate_demo_data.py)
+data/agentforge.db
+data/agentforge.db-*
+data/demo/*.db
+data/demo/*.csv
+artifacts/
+logs/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm-cache/
+npm-debug.log*
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.chrome-profile/
+.edge-profile/
+
+# Scratch
+_tmp_*
+agentforge-tests-*/

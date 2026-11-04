@@ -1,0 +1,149 @@
+# ---------------------------------------------------------------------------
+# AgentForge — production-style stack (Compose spec v2, no obsolete `version:`)
+#
+# Default (two services):
+#   docker compose up -d --build
+#     postgres  pgvector/pgvector:pg16, named volume, pg_isready healthcheck
+#     backend   image built from ./Dockerfile, FastAPI + built SPA on :8000
+#
+# Optional profiles:
+#   docker compose --profile jobs up -d
+#     redis     reserved for future background-job/queue work (current code is
+#               in-process only — nothing consumes Redis yet)
+#   docker compose --profile observability up -d
+#     otel-collector  OTLP receiver; see docs/observability.md
+#
+# Configuration: backend reads .env (if present) then the container-internal
+# overrides below. `docker compose config` parses without .env because the
+# env_file entry is optional (Compose >= 2.24).
+# ---------------------------------------------------------------------------
+
+name: agentforge
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentforge}
+      POSTGRES_USER: ${POSTGRES_USER:-agentforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentforge}
+      # Faster-than-default startup for small dev/prod-compose instances.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      # Bind to loopback only; the backend reaches Postgres over the compose
+      # network. Remove or narrow this mapping in a hardened deployment.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once on a fresh volume: enables pgvector (+ pg_trgm).
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Empty = same-origin `/api` (production default).
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    image: agentforge-backend:local
+    container_name: agentforge-backend
+    restart: unless-stopped
+    init: true
+    env_file:
+      # Optional so `docker compose config` / CI works before a .env exists.
+      - path: .env
+        required: false
+    environment:
+      # Container-internal values override anything read from .env.
+      # Credentials match the postgres service defaults above; change both
+      # together if you override POSTGRES_USER / POSTGRES_PASSWORD.
+      DATABASE_URL: postgresql+psycopg://agentforge:agentforge@postgres:5432/agentforge
+      ARTIFACTS_DIR: /app/artifacts
+      SALES_DB_PATH: /app/data/demo/sales.db
+      KNOWLEDGE_DIR: /app/data/knowledge
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173}
+      # Only meaningful when the `observability` profile is enabled and the
+      # app is instrumented with an OTel SDK/exporter (currently not wired).
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-agentforge-backend}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      # Reports/artifacts survive container rebuilds.
+      - artifacts:/app/artifacts
+    security_opt:
+      - no-new-privileges:true
+    # Healthcheck is inherited from the image (GET /api/health).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # -------------------------------------------------------------------------
+  # Optional: Redis for future background jobs / rate limiting.
+  # Current code schedules runs in-process; enabling this profile changes
+  # nothing until a consumer is added.
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: agentforge-redis
+    profiles: ["jobs"]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # -------------------------------------------------------------------------
+  # Optional: OpenTelemetry collector (OTLP in, debug/console out).
+  # Enable with: docker compose --profile observability up -d
+  # See docs/observability.md — app instrumentation is not wired today.
+  # -------------------------------------------------------------------------
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.104.0}
+    container_name: agentforge-otel-collector
+    profiles: ["observability"]
+    restart: unless-stopped
+    volumes:
+      - ./docker/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:
+  artifacts:
+  redisdata:

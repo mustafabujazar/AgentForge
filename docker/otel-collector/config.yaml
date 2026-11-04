@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Minimal OpenTelemetry Collector config for the optional `observability`
+# compose profile. Receives OTLP (gRPC 4317 / HTTP 4318) and prints batches to
+# stdout (`docker compose logs otel-collector`).
+#
+# NOTE: the app currently ships only `opentelemetry-api` (no SDK/exporter), so
+# nothing is exported yet. This collector is scaffolding for future
+# instrumentation or for other workloads; see docs/observability.md.
+#
+# Replace the `debug` exporter with `otlphttp`/`prometheus` when exporting to
+# a real backend.
+# ---------------------------------------------------------------------------
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

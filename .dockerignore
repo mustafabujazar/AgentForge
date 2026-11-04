@@ -1,0 +1,63 @@
+# VCS / editor / OS noise
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Python virtualenvs and caches (never ship the host venv)
+venv
+.venv
+env
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.pytype
+.coverage
+htmlcov
+coverage.xml
+
+# Local secrets — never baked into the image; containers get env at runtime
+.env
+.env.*
+!.env.example
+
+# Tool caches / scratch files
+.npm-cache
+_tmp_*
+
+# Node / frontend build artifacts (rebuilt inside the image)
+node_modules
+frontend/node_modules
+frontend/dist
+dist
+build
+.vite
+*.tsbuildinfo
+
+# Runtime output / state
+artifacts
+logs
+*.log
+agentforge.db
+*.sqlite
+*.sqlite3
+
+# Local infra state
+postgres-data
+pgdata
+redis-data
+
+# Docs, tests and dev tooling are not needed in the runtime image.
+# (Keeping them out also keeps the build context small.)
+docs
+tests
+README*
+Makefile
+docker-compose*.yml
+docker/otel-collector

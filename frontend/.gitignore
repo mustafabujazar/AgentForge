@@ -1,0 +1,5 @@
+node_modules/
+.ssr-test/
+.preview/
+.chrome-preview/
+*.log

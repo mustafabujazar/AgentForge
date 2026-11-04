@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
+    "allowUmdGlobalAccess": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "outDir": ".ssr-test",
+    "rootDir": ".",
+    "types": []
+  },
+  "include": ["scripts/ssr-smoke.tsx", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/main.tsx"]
+}
